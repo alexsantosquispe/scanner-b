@@ -1,11 +1,13 @@
 import { useRef, useState } from 'react';
 
+import Tesseract from 'tesseract.js';
 import Webcam from 'react-webcam';
 
 function App() {
   const webcamRef = useRef<Webcam>(null);
 
   const [cropped, setCropped] = useState<string | null>(null);
+  const [text, setText] = useState<string>('');
 
   const cropImage = (imageSrc: string) => {
     return new Promise<string>((resolve) => {
@@ -42,12 +44,29 @@ function App() {
     });
   };
 
+  const runOCR = async (image: string) => {
+    const worker = await Tesseract.createWorker('eng');
+
+    await worker.setParameters({
+      tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    });
+
+    const result = await worker.recognize(image);
+
+    await worker.terminate();
+
+    return result.data.text;
+  };
+
   const capture = async () => {
     const screenshot = webcamRef.current?.getScreenshot();
     if (!screenshot) return;
 
     const croppedImage = await cropImage(screenshot);
     setCropped(croppedImage);
+
+    const detectedText = await runOCR(croppedImage);
+    setText(detectedText);
   };
 
   return (
@@ -72,9 +91,20 @@ function App() {
       </button>
 
       {cropped && (
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center gap-2">
           <p className="text-sm">Área escaneada</p>
-          <img src={cropped} className="w-80 rounded border border-green-400" />
+          <img
+            src={cropped}
+            alt="cropped"
+            className="w-80 rounded border border-green-400"
+          />
+        </div>
+      )}
+
+      {text && (
+        <div className="rounded bg-white p-3 text-black">
+          <p className="text-sm font-semibold">Texto detectado</p>
+          <p>{text}</p>
         </div>
       )}
     </div>
